@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Finansal Takvim ve Ödeme Takip Sistemi</title>
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0ea5e9">
+    <link rel="apple-touch-icon"
+        href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%230f172a'/><path d='M350 180H160a20 20 0 00-20 20v112a20 20 0 0020 20h190a20 20 0 0020-20V200a20 20 0 00-20-20z' fill='%23fff'/></svg>">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            900: '#134e4a',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/dayjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/locale/tr.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/isSameOrBefore.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1/plugin/isSameOrAfter.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/litepicker/dist/litepicker.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/litepicker/dist/css/litepicker.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="bg-gray-50 text-slate-800 font-sans min-h-screen flex flex-col">
+    
+    <!-- Login Modal -->
+    <div id="loginOverlay" class="fixed inset-0 z-[1000] bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4 transition-opacity duration-300">
+        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-700/10">
+            <div class="flex flex-col items-center gap-4 mb-8">
+                <div class="bg-brand-500 text-white p-4 rounded-2xl shadow-lg ring-4 ring-brand-100 italic">
+                    <i data-lucide="lock" class="w-8 h-8"></i>
+                </div>
+                <div class="text-center">
+                    <h2 class="text-2xl font-black text-slate-900">Güvenli Giriş</h2>
+                    <p class="text-slate-500 text-sm mt-1">Ödemelerinize erişmek için şifrenizi girin</p>
+                </div>
+            </div>
+            
+            <form id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">ERİŞİM ŞİFRESİ</label>
+                    <div class="relative">
+                        <input type="password" id="loginPassword" required
+                            class="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none transition-all font-mono"
+                            placeholder="••••••••">
+                        <i data-lucide="key" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    </div>
+                </div>
+                <button type="submit"
+                    class="group w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white py-3.5 rounded-xl font-bold transition-all shadow-lg hover:shadow-brand-500/30">
+                    Sistemi Aç
+                    <i data-lucide="chevron-right" class="w-4 h-4 group-hover:translate-x-1 transition-transform"></i>
+                </button>
+                <div class="flex items-center gap-2 py-2">
+                    <div class="h-px bg-slate-100 flex-1"></div>
+                    <span class="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-loose">VEYA</span>
+                    <div class="h-px bg-slate-100 flex-1"></div>
+                </div>
+                <button type="button" id="loginCloudBtn"
+                    class="w-full flex items-center justify-center gap-2 bg-slate-50 hover:bg-slate-100 text-indigo-600 border border-slate-200 py-3 rounded-xl font-bold transition-all text-xs">
+                    <i data-lucide="cloud-cog" class="w-4 h-4"></i>
+                    Bulut Hesabımı Bağla
+                </button>
+                <div id="loginError" class="hidden text-red-500 text-[10px] font-black text-center uppercase tracking-wider animate-bounce mt-2">
+                    HATALI ŞİFRE VEYA BAĞLANTI SORUNU!
+                </div>
+            </form>
+            <div class="mt-8 text-center">
+                <p class="text-[10px] text-slate-400 font-bold uppercase tracking-widest leading-loose">Şifreleme: AES-256 (Askeri Düzey)<br>Verileriniz ulaşılamaz durumda.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header & Filter Panel -->
+    <header class="bg-white shadow-sm sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="bg-brand-500 text-white p-2 rounded-lg">
+                        <i data-lucide="calendar-days"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-slate-900 leading-tight">Finansal Takvim</h1>
+                        <p class="text-sm text-slate-500">Ödeme Takip Sistemi</p>
+                    </div>
+                </div>
+
+                <!-- Middle Sync Button -->
+                <div class="hidden lg:flex flex-1 justify-center">
+                    <button id="manualSyncBtn" 
+                        class="group flex flex-col items-center justify-center gap-2 px-6 py-4 bg-violet-600 hover:bg-violet-700 text-white rounded-2xl border-2 border-violet-400 font-black text-[9px] uppercase tracking-[0.15em] shadow-xl shadow-violet-200 hover:shadow-violet-300 transition-all active:scale-95 text-center leading-relaxed">
+                        <i data-lucide="refresh-cw" class="w-5 h-5 group-hover:rotate-180 transition-transform duration-700"></i>
+                        <span>SAYFAYI YENİLE,<br>VERİLERİ GÜNCELLE</span>
+                    </button>
+                </div>
+
+                <!-- Filters & Actions -->
+                <div class="flex flex-col gap-3">
+                    <div class="flex flex-col sm:flex-row items-center gap-3">
+                        <button id="addPaymentBtn"
+                            class="flex-shrink-0 w-full sm:w-auto flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm">
+                            <i data-lucide="plus" class="w-4 h-4 pointer-events-none"></i>
+                            Ödeme Ekle
+                        </button>
+
+                        <div class="flex items-center gap-2 w-full sm:w-auto justify-center">
+                            <button id="exportExcelBtn"
+                                class="p-2 text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
+                                title="Excel İndir">
+                                <i data-lucide="sheet" class="w-5 h-5 pointer-events-none"></i>
+                            </button>
+                            <button id="exportPdfBtn"
+                                class="p-2 text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-colors border border-red-200"
+                                title="PDF İndir">
+                                <i data-lucide="file-text" class="w-5 h-5 pointer-events-none"></i>
+                            </button>
+                            <div class="h-6 w-px bg-gray-200 mx-1"></div>
+                            <button id="cloudSettingsBtn"
+                                class="p-2 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors border border-indigo-200 relative"
+                                title="Bulut Senkronizasyon Ayarları">
+                                <i data-lucide="cloud-cog" class="w-5 h-5 pointer-events-none"></i>
+                                <span id="cloudStatusDot" class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-slate-300 border-2 border-white"></span>
+                            </button>
+                            <button id="exportDbBtn"
+                                class="p-2 text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors border border-slate-200"
+                                title="Yedek Al (JSON)">
+                                <i data-lucide="download-cloud" class="w-5 h-5 pointer-events-none"></i>
+                            </button>
+                            <input type="file" id="importDbInput" class="hidden" accept=".json">
+                            <button id="importDbBtn"
+                                class="p-2 text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-lg transition-colors border border-brand-200"
+                                title="Yedekten Yükle">
+                                <i data-lucide="upload-cloud" class="w-5 h-5 pointer-events-none"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button id="showAllPaymentsBtn"
+                        class="flex items-center gap-2 px-6 py-2.5 bg-brand-600 text-white rounded-xl font-bold shadow-lg shadow-brand-200 hover:bg-brand-700 transition-all active:scale-95 text-sm uppercase tracking-wider">
+                        <i data-lucide="list"></i>
+                        TÜM ÖDEMELER
+                    </button>
+                    <button id="showMonthlyTableBtn"
+                        class="flex items-center gap-2 px-6 py-2.5 bg-slate-800 text-white rounded-xl font-bold shadow-lg shadow-slate-200 hover:bg-slate-900 transition-all active:scale-95 text-sm uppercase tracking-wider">
+                        <i data-lucide="calendar-check"></i>
+                        AYLIK TABLO
+                    </button>
+                    <!-- PWA Install Button (Initially hidden) -->
+                    <button id="installAppButton"
+                        class="hidden flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-200 hover:bg-indigo-700 transition-all active:scale-95 text-sm uppercase tracking-wider">
+                        <i data-lucide="download"></i>
+                        Masaüstüne / Widget Yap
+                    </button>
+                </div>
+            </div>
+
+            <!-- Monthly Table Modal Overlay -->
+            <div id="monthlyTableModalOverlay"
+                class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+                <div id="monthlyTableModal"
+                    class="bg-white rounded-3xl w-full max-w-5xl max-h-[90vh] overflow-hidden shadow-2xl scale-95 opacity-0 transition-all duration-300 flex flex-col">
+                    <div
+                        class="p-6 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
+                        <div class="flex items-center gap-3">
+                            <div class="bg-slate-100 text-slate-600 p-2 rounded-xl">
+                                <i data-lucide="table"></i>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-4">
+                                    <h2 id="monthlyTableTitle" class="text-xl font-bold text-slate-900">Aylık Ödeme
+                                        Tablosu</h2>
+                                    <div class="flex items-center gap-2">
+                                        <button id="monthlyPrevMonthBtn"
+                                            class="p-1.5 hover:bg-slate-100 rounded-md transition-colors text-slate-600 border border-slate-200 bg-white shadow-sm hover:text-brand-600"><i
+                                                data-lucide="chevron-left"
+                                                class="w-4 h-4 pointer-events-none"></i></button>
+                                        <div class="flex items-center gap-1">
+                                            <select id="monthlyMonthSelect"
+                                                class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-brand-500 outline-none">
+                                                <option value="0">Ocak</option>
+                                                <option value="1">Şubat</option>
+                                                <option value="2">Mart</option>
+                                                <option value="3">Nisan</option>
+                                                <option value="4">Mayıs</option>
+                                                <option value="5">Haziran</option>
+                                                <option value="6">Temmuz</option>
+                                                <option value="7">Ağustos</option>
+                                                <option value="8">Eylül</option>
+                                                <option value="9">Ekim</option>
+                                                <option value="10">Kasım</option>
+                                                <option value="11">Aralık</option>
+                                            </select>
+                                            <select id="monthlyYearSelect"
+                                                class="bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-brand-500 outline-none">
+                                                <option value="2025">2025</option>
+                                                <option value="2026" selected>2026</option>
+                                                <option value="2027">2027</option>
+                                                <option value="2028">2028</option>
+                                                <option value="2029">2029</option>
+                                                <option value="2030">2030</option>
+                                            </select>
+                                        </div>
+                                        <button id="monthlyNextMonthBtn"
+                                            class="p-1.5 hover:bg-slate-100 rounded-md transition-colors text-slate-600 border border-slate-200 bg-white shadow-sm hover:text-brand-600"><i
+                                                data-lucide="chevron-right"
+                                                class="w-4 h-4 pointer-events-none"></i></button>
+                                    </div>
+                                </div>
+                                <p class="text-xs text-slate-500 font-medium tracking-tight">Ödemelerin kronolojik
+                                    listesi</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button id="exportMonthlyExcelBtn"
+                                class="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 rounded-xl font-bold hover:bg-emerald-100 transition-all text-xs">
+                                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> EXCEL
+                            </button>
+                            <button id="exportMonthlyPdfBtn"
+                                class="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-xl font-bold hover:bg-red-100 transition-all text-xs">
+                                <i data-lucide="file-text" class="w-4 h-4"></i> PDF
+                            </button>
+                            <button id="closeMonthlyTableModalBtn"
+                                class="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400">
+                                <i data-lucide="x"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="monthlyTableContent" class="flex-1 overflow-y-auto p-6">
+                        <!-- Table will be rendered here -->
+                    </div>
+                </div>
+            <!-- Sync & Overall Total Panel -->
+            <div class="mt-8 flex flex-col items-center gap-4">
+                <div
+                    class="inline-flex items-center gap-4 bg-gradient-to-r from-slate-900 to-slate-800 text-white px-8 py-4 rounded-2xl shadow-lg ring-1 ring-white/10">
+                    <div class="p-3 bg-white/10 rounded-xl">
+                        <i data-lucide="wallet" class="w-6 h-6 text-brand-100"></i>
+                    </div>
+                    <div>
+                        <div class="text-slate-300 text-sm font-medium mb-1">Toplam Ödeme</div>
+                        <div class="text-3xl font-bold tracking-tight text-white" id="overallTotalDisplay">0 TL</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Calendar Area -->
+    <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+        <!-- Week Navigation -->
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-lg font-semibold text-slate-800" id="currentPeriodLabel">Görünüm</h2>
+            <div class="flex gap-2">
+                <button id="todayBtn"
+                    class="p-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors text-sm font-medium text-slate-600">Bugün</button>
+                <div class="relative group">
+                    <input type="text" id="jumpToDate" placeholder="Tarih Seç" readonly
+                        class="w-32 px-3 py-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors text-sm font-medium text-slate-600 outline-none cursor-pointer">
+                </div>
+                <button id="prevWeekBtn"
+                    class="p-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors">
+                    <i data-lucide="chevron-left" class="w-5 h-5 text-gray-600"></i>
+                </button>
+                <button id="nextWeekBtn"
+                    class="p-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors">
+                    <i data-lucide="chevron-right" class="w-5 h-5 text-gray-600"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Scrollable 5-Column Grid -->
+        <div
+            class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-x-auto custom-scroll outline outline-1 outline-gray-100">
+            <div class="min-w-[800px] grid grid-cols-5 divide-x-2 divide-gray-200 min-h-[500px]" id="calendarContainer">
+                <!-- Columns injected by JS -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Overlay -->
+    <div id="paymentModalOverlay"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[150] flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+
+        <!-- Modal Content -->
+        <div id="paymentModal"
+            class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform scale-95 opacity-0 transition-all duration-300">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h3 class="text-lg font-semibold text-gray-900" id="modalTitle">Ödeme Kaydı</h3>
+                <button id="closeModalBtn"
+                    class="text-gray-400 hover:text-gray-700 transition-colors rounded-lg p-1 hover:bg-gray-100">
+                    <i data-lucide="x" class="w-5 h-5 pointer-events-none"></i>
+                </button>
+            </div>
+
+            <form id="paymentForm" class="p-6 space-y-5">
+                <input type="hidden" id="editingId" value="">
+                <input type="hidden" id="editingGroupId" value="">
+
+
+                <!-- Basic Info -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="space-y-1 sm:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700">Başlık / Açıklama</label>
+                        <input type="text" id="payTitle" required placeholder="Örn: X Firması Fatura Ödemesi"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-shadow text-sm">
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="block text-sm font-medium text-gray-700">Tutar (TL)</label>
+                        <input type="number" id="payAmount" required min="0" step="0.01" placeholder="0.00"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-shadow text-sm">
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="block text-sm font-medium text-gray-700">Ödeme Türü</label>
+                        <select id="payCategory"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-shadow text-sm bg-white">
+                            <option value="Kredi">Kredi</option>
+                            <option value="Çek">Çek</option>
+                            <option value="Kira">Kira</option>
+                            <option value="Kredi Kartı">Kredi Kartı</option>
+                            <option value="Fatura">Fatura</option>
+                            <option value="Diğer" selected>Diğer</option>
+                        </select>
+                    </div>
+
+                    <div class="space-y-1">
+                        <label class="block text-sm font-medium text-gray-700">Banka / Hesap</label>
+                        <select id="payBank"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-shadow text-sm bg-white">
+                            <option value="AKBANK">AKBANK</option>
+                            <option value="DENİZBANK">DENİZBANK</option>
+                            <option value="GARANTİ">GARANTİ</option>
+                            <option value="HALK BANKASI">HALK BANKASI</option>
+                            <option value="İNG">İNG</option>
+                            <option value="İŞ BANKASI">İŞ BANKASI</option>
+                            <option value="KUVEYTTÜRK">KUVEYTTÜRK</option>
+                            <option value="QNB">QNB</option>
+                            <option value="ŞEKERBANK">ŞEKERBANK</option>
+                            <option value="TEB">TEB</option>
+                            <option value="VAKIFBANK">VAKIFBANK</option>
+                            <option value="VAKIF KATILIM">VAKIF KATILIM</option>
+                            <option value="YAPIKREDİ">YAPIKREDİ</option>
+                            <option value="ZİRAAT">ZİRAAT</option>
+                            <option value="ZİRAAT KATILIM BANKASI">ZİRAAT KATILIM BANKASI</option>
+                            <option value="NAKİT KASA">NAKİT KASA</option>
+                            <option value="DİĞER">DİĞER</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Date & Recurrence -->
+                <div class="p-4 bg-gray-50 rounded-xl border border-gray-100 space-y-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="space-y-1">
+                            <label class="block text-sm font-medium text-gray-700">Tarih</label>
+                            <input type="text" id="payDate" required readonly placeholder="Yıl-Ay-Gün"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-shadow text-sm bg-white cursor-pointer">
+                        </div>
+                        <div class="space-y-1" id="typeContainer">
+                            <label class="block text-sm font-medium text-gray-700">Ödeme Şekli</label>
+                            <select id="payType"
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-shadow text-sm bg-white">
+                                <option value="installments" selected>Taksit Sayısı</option>
+                                <option value="first_working_day">Her Ayın İlk İş Günü</option>
+                                <option value="last_working_day">Her Ayın Son İş Günü</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="installmentsWrapper" class="space-y-1">
+                        <label class="block text-sm font-medium text-gray-700">Taksit Sayısı / Ay Tekrarı</label>
+                        <input type="number" id="payInstallments" min="1" max="120" value="1"
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-shadow text-sm bg-white">
+                    </div>
+                </div>
+                <div class="space-y-1">
+                    <label class="block text-sm font-medium text-gray-700">Not / Açıklama</label>
+                    <textarea id="payNote" rows="2"
+                        placeholder="Grup taksitlerine veya tekil ödemeye özel not ekleyin..."
+                        class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-shadow text-sm bg-white"></textarea>
+                </div>
+
+                <div class="mt-6 pt-4 border-t border-gray-100 flex justify-end gap-3">
+                    <button type="button" id="cancelPaymentBtn"
+                        class="px-5 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+                        İptal
+                    </button>
+                    <button type="submit" id="savePaymentBtn"
+                        class="px-5 py-2 text-sm font-medium text-white bg-brand-600 rounded-lg hover:bg-brand-700 transition-colors shadow-sm">
+                        Kaydet
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- All Payments Modal -->
+    <div id="allPaymentsModalOverlay"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div id="allPaymentsModal"
+            class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[85vh] overflow-hidden transform scale-95 opacity-0 transition-all duration-300 flex flex-col">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="list" class="w-5 h-5 text-indigo-600 pointer-events-none"></i>
+                        <h3 class="text-lg font-semibold text-gray-900">Tüm Ödemeler</h3>
+                    </div>
+                    <div class="flex items-center gap-4 border-l border-gray-200 pl-6">
+                        <div class="text-right">
+                            <p class="text-[9px] font-bold text-gray-400 uppercase">Genel Toplam</p>
+                            <p id="listTotalAll" class="text-sm font-black text-slate-900 text-nowrap">0 TL</p>
+                        </div>
+                        <div class="text-right bg-indigo-50 px-3 py-1 rounded-xl">
+                            <p class="text-[9px] font-bold text-indigo-400 uppercase">Gelecek Ödemeler (Kalan)</p>
+                            <p id="listTotalRemaining" class="text-sm font-black text-indigo-600 text-nowrap">0 TL</p>
+                        </div>
+                    </div>
+                </div>
+                <button id="closeAllPaymentsModalBtn"
+                    class="text-gray-400 hover:text-gray-700 transition-colors rounded-lg p-1 hover:bg-gray-100">
+                    <i data-lucide="x" class="w-5 h-5 pointer-events-none"></i>
+                </button>
+            </div>
+
+            <div class="flex-grow overflow-y-auto p-6 custom-scroll" id="allPaymentsContent">
+                <!-- Content will be injected by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Version Footer -->
+    <footer class="py-6 mt-12 text-center border-t border-slate-100/50 bg-slate-50/20">
+        <div class="flex flex-col items-center gap-2">
+            <div class="flex items-center gap-3">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <p class="text-[10px] font-black text-slate-400 tracking-[0.3em] uppercase">Güvenli Bulut Bağlantısı • Sürüm 2.1.0</p>
+            </div>
+            <p class="text-[9px] font-bold text-slate-300">Bu uygulama sadece cihazınızda ve GitHub deponuzda şifreli veri saklar.</p>
+        </div>
+    </footer>
+
+    <!-- Cloud Settings Modal -->
+    <div id="cloudSettingsModalOverlay"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[200] flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div id="cloudSettingsModal"
+            class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 opacity-0 transition-all duration-300">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-indigo-50/50">
+                <div class="flex items-center gap-2">
+                    <i data-lucide="cloud-cog" class="w-5 h-5 text-indigo-600"></i>
+                    <h3 class="text-lg font-bold text-gray-900">Bulut Senkronizasyon</h3>
+                </div>
+                <button id="closeCloudSettingsBtn" class="text-gray-400 hover:text-gray-700 transition-colors rounded-lg p-1">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p class="text-xs text-slate-500 font-medium leading-relaxed italic">Verilerinizi her tarayıcıda güncel tutmak için GitHub hesabınızı bağlayın. Bu ayar sadece bu tarayıcıda saklanır.</p>
+                
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 ml-1">Kullanıcı Adı (GitHub)</label>
+                        <input type="text" id="ghUsername" placeholder="" 
+                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 ml-1">Depo (Repo) İsmi</label>
+                        <input type="text" id="ghRepo" placeholder="" 
+                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-400 uppercase mb-1 ml-1">Personal Access Token (PAT)</label>
+                        <input type="password" id="ghToken" placeholder="github_pat_..." 
+                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-xs font-mono">
+                        <a href="https://github.com/settings/tokens/new?scopes=repo&description=FinanceAppSync" target="_blank" class="inline-block mt-2 text-[9px] font-bold text-indigo-600 hover:underline">Token Nasıl Alınır? (Sadece 'repo' yetkisi yeterli)</a>
+                    </div>
+                </div>
+
+                <div id="cloudTestResult" class="hidden text-center py-2 px-3 rounded-lg text-xs font-bold"></div>
+
+                <div class="flex gap-3 mt-6">
+                    <button id="saveCloudSettingsBtn" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl shadow-lg transition-all active:scale-95 text-sm">Ayarları Kaydet</button>
+                    <button id="disconnectCloudBtn" class="bg-red-50 text-red-600 hover:bg-red-100 font-bold px-4 py-3 rounded-xl transition-all active:scale-95 text-sm" title="Bağlantıyı Kes"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+                </div>
+                
+                <div class="pt-4 border-t border-slate-100 mt-4">
+                    <button id="forceUpdateBtn" class="w-full flex items-center justify-center gap-2 py-2.5 text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest transition-colors">
+                        <i data-lucide="refresh-cw" class="w-3 h-3"></i>
+                        Önbelleği Temizle ve Zorla Güncelle
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Group Delete Modal -->
+    <div id="confirmDeleteModalOverlay"
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[60] flex items-center justify-center p-4 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div id="confirmDeleteModal"
+            class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform scale-95 opacity-0 transition-all duration-300">
+            <div class="p-6">
+                <div class="flex items-center gap-4 mb-4 text-red-600">
+                    <div class="bg-red-100 p-3 rounded-full">
+                        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                    </div>
+                    <h3 class="text-lg font-bold" id="deleteModalTitle">Ödeme Silme Onayı</h3>
+                </div>
+                <p class="text-gray-600 mb-6" id="deleteModalText">Bu ödeme bir grubun (kredi/taksit) bir parçasıdır.
+                    Nasıl silmek istersiniz?</p>
+                <div class="space-y-3" id="deleteModalActions">
+                    <!-- Buttons will be injected or toggled by JS -->
+                    <div id="groupDeleteActions" class="space-y-3">
+                        <button id="deleteOnlyThisBtn"
+                            class="w-full py-3 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-medium rounded-xl transition-colors flex items-center justify-between">
+                            <span>Sadece Bu Taksiti Sil</span>
+                            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                        </button>
+                        <button id="deleteAllGroupBtn"
+                            class="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors flex items-center justify-between shadow-sm">
+                            <span>Tüm Kredi Tablosunu Sil</span>
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <div id="singleDeleteActions" class="hidden">
+                        <button id="confirmSingleDeleteBtn"
+                            class="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors shadow-sm">
+                            Evet, Sil
+                        </button>
+                    </div>
+
+                    <button id="cancelDeleteBtn"
+                        class="w-full py-2 px-4 text-gray-400 hover:text-gray-600 font-medium transition-colors">
+                        Vazgeç
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PWA Service Worker -->
+    <button id="installAppButton" class="hidden fixed bottom-4 right-4 bg-brand-600 text-white px-4 py-2 rounded-lg shadow-lg z-[200]">Uygulamayı Yükle</button>
+    <script>
+        let deferredPrompt;
+        const installAppButton = document.getElementById('installAppButton');
+
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            if (installAppButton) installAppButton.classList.remove('hidden');
+        });
+
+        if (installAppButton) {
+            installAppButton.onclick = async () => {
+                if (!deferredPrompt) return;
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                if (outcome === 'accepted') installAppButton.classList.add('hidden');
+                deferredPrompt = null;
+            };
+        }
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then(reg => console.log('SW Registered', reg))
+                    .catch(err => console.log('SW Failed', err));
+            });
+        }
+    </script>
+    <script src="app.js"></script>
+</body>
+
+</html>

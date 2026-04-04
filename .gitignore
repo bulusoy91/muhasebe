@@ -1,0 +1,19 @@
+# NeutralinoJS
+bin/
+dist/
+neutralinojs.log
+
+# Temporary files
+.tmp/
+.gemini/
+.DS_Store
+Thumbs.db
+
+# Data files (Private data shouldn't be on GitHub)
+*.json
+!manifest.json
+!neutralino.config.json
+!odemeler_yedek_sifreli.json
+
+# Web PWA / Service Worker logs
+sw.js.map
