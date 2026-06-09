@@ -11,7 +11,7 @@ let groupNotes = {};
 
 const incomeCategories = [
     "Satışlardan Elde Edilen Nakit",
-    "Döviz Kuru Değerleme Kazancı",
+    "Döviz Satış Karları",
     "Faiz Gelirleri",
     "Alınan Krediler",
     "Ortaklardan Alınan Bedel",
@@ -27,17 +27,18 @@ const CLOUD_FILENAME = 'odemeler_yedek_sifreli.json';
 window.downloadSampleExcel = function () {
     const cats = Object.keys(categoryColors);
     const banks = Object.keys(bankColors);
+    const paymentTypes = ["Kredi", "Çek", "Kira", "Kredi Kartı", "Fatura", "Diğer"];
     const subCats = ["Stok", "Hizmet", "Kredi Ödemesi", "Banka Giderleri", "Akaryakıt", "Kum", "Beton", "Nakliye", "Araç Kira", "Ev Kira", "Araç Giderleri", "Maaş+SGK", "Vergiler", "Ortaklara Ödenen", "İş Kazası", "Kredi Kartı", "İSG Harcaması", "Trafik Cezaları", "Diğer"];
 
-    // Ana Taslak + H Sütununda Bankalar + I Sütununda Kategoriler
+    // Ana Taslak + H Boş + I Sütununda Bankalar + J Sütununda Kategoriler + K Ödeme Türleri
     const data = [
-        ['Tarih', 'Aciklama', 'Banka', 'Ödeme Türü', 'Tutar', 'Kategori', 'Not', 'GEÇERLİ BANKALAR', 'KATEGORİLER'],
-        [dayjs().format('DD.MM.YYYY'), 'Örnek Ödeme', 'AKBANK', 'Fatura', 1500.50, 'Kum', 'Örnek Not', banks[0] || '', subCats[0] || ''],
+        ['Tarih', 'Aciklama', 'Banka', 'Ödeme Türü', 'Tutar', 'Kategori', 'Not', '', 'GEÇERLİ BANKALAR', 'KATEGORİLER', 'ÖDEME TÜRLERİ'],
+        [dayjs().format('DD.MM.YYYY'), 'Örnek Ödeme', 'AKBANK', 'Fatura', 1500.50, 'Kum', 'Örnek Not', '', banks[0] || '', subCats[0] || '', paymentTypes[0] || ''],
     ];
 
-    const maxLen = Math.max(banks.length, subCats.length, 20);
+    const maxLen = Math.max(banks.length, subCats.length, paymentTypes.length, 20);
     for (let i = 1; i < maxLen; i++) {
-        data.push(['', '', '', '', '', '', '', banks[i] || '', subCats[i] || '']);
+        data.push(['', '', '', '', '', '', '', '', banks[i] || '', subCats[i] || '', paymentTypes[i] || '']);
     }
 
     const ws = XLSX.utils.aoa_to_sheet(data);
@@ -46,24 +47,24 @@ window.downloadSampleExcel = function () {
     ws['!cols'] = [
         { wch: 11 }, { wch: 11 }, { wch: 11 }, { wch: 11 }, { wch: 11 }, { wch: 11 }, // A, B, C, D, E, F
         { wch: 25 },                                                   // G (Not: 25)
-        { wch: 10 },                                                   // H (Boşluk)
+        { wch: 5 },                                                    // H (Boşluk)
         { wch: 23 }, { wch: 23 }, { wch: 23 }                          // I, J, K (Rehber: 23)
     ];
 
     // SATIR YÜKSEKLİKLERİ
     ws['!rows'] = [{ hpt: 27 }];
-    for (let i = 1; i < 30; i++) ws['!rows'].push({ hpt: 20 });
+    for (let i = 1; i < maxLen + 1; i++) ws['!rows'].push({ hpt: 20 });
 
     // Stiller
     const b = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
     const headerStyle = {
-        font: { bold: true, size: 16 },
-        fill: { fgColor: { rgb: "B2B2B2" } }, // Daha koyu gri
+        font: { bold: true, size: 12 },
+        fill: { fgColor: { rgb: "B2B2B2" } },
         border: b,
         alignment: { horizontal: "center", vertical: "center" }
     };
     const helperHeaderStyle = {
-        font: { bold: true, size: 16, name: "Calibri" },
+        font: { bold: true, size: 12, name: "Calibri" },
         fill: { fgColor: { rgb: "B2B2B2" } },
         border: b,
         alignment: { horizontal: "center", vertical: "center" }
@@ -82,8 +83,8 @@ window.downloadSampleExcel = function () {
                 // Header (1. Satır)
                 if (C === 8 || C === 9 || C === 10) ws[addr].s = helperHeaderStyle;
                 else if (C < 7) ws[addr].s = headerStyle;
-            } else if (R < 30) {
-                // Zebra (2-30. Satır)
+            } else if (R < data.length) {
+                // Zebra (2-X. Satır)
                 if (C < 7 || C === 8 || C === 9 || C === 10) {
                     ws[addr].s = (R % 2 === 0) ? blueZebra : greenZebra;
                 }
@@ -237,6 +238,7 @@ async function loadEncryptedData(enteredPass) {
         // 2. BULUT BAŞARISIZSA VEYA AYAR YOKSA LOCALSTORAGE'A BAK
         if (!encPayments) {
             encPayments = localStorage.getItem('odemeler_enc');
+            encIncomes = localStorage.getItem('gelirler_enc');
             encNotes = localStorage.getItem('grup_notlari_enc');
             encSticky = localStorage.getItem('sticky_note_enc');
         }
@@ -249,6 +251,7 @@ async function loadEncryptedData(enteredPass) {
                     const data = await response.json();
                     if (data.encrypted) {
                         encPayments = data.payments_enc;
+                        encIncomes = data.incomes_enc;
                         encNotes = data.grup_notlari_enc;
                         encSticky = data.sticky_note_enc;
                     }
@@ -276,7 +279,14 @@ async function loadEncryptedData(enteredPass) {
                         const ln = localStorage.getItem('grup_notlari_enc');
                         if (ln) groupNotes = JSON.parse(CryptoJS.AES.decrypt(ln, enteredPass).toString(CryptoJS.enc.Utf8));
                         const li = localStorage.getItem('gelirler_enc');
-                        if (li) incomes = JSON.parse(CryptoJS.AES.decrypt(li, enteredPass).toString(CryptoJS.enc.Utf8));
+                        if (li) {
+                            incomes = JSON.parse(CryptoJS.AES.decrypt(li, enteredPass).toString(CryptoJS.enc.Utf8));
+                            incomes.forEach(i => {
+                                if (i.category === "Döviz Kuru Değerleme Kazancı" || i.category === "Döviz Kuru değerleme kazancı") {
+                                    i.category = "Döviz Satış Karları";
+                                }
+                            });
+                        }
                         masterKey = enteredPass;
                         return true; 
                     }
@@ -293,7 +303,14 @@ async function loadEncryptedData(enteredPass) {
             try {
                 const bytesInc = CryptoJS.AES.decrypt(encIncomes, enteredPass);
                 const decInc = bytesInc.toString(CryptoJS.enc.Utf8);
-                if (decInc) incomes = JSON.parse(decInc);
+                if (decInc) {
+                    incomes = JSON.parse(decInc);
+                    incomes.forEach(i => {
+                        if (i.category === "Döviz Kuru Değerleme Kazancı" || i.category === "Döviz Kuru değerleme kazancı") {
+                            i.category = "Döviz Satış Karları";
+                        }
+                    });
+                }
             } catch (e) { }
         }
 
@@ -1104,7 +1121,7 @@ window.exportToExcel = function (dataInput, filename, titleStr = '', periodStr =
         [titleStr || "MUHASEBE TAKİP - ÖDEME RAPORU"],
         [periodStr || ("Dönem: " + (month + 1) + "/" + year)],
         [''], // Empty spacer
-        ['Tarih', 'Aciklama', 'Banka', 'Ödeme Türü', 'Tutar', 'Kategori', 'Not']
+        ['Tarih', 'Aciklama', 'Banka', 'Tutar', 'Kategori', 'Not']
     ];
 
     data.forEach(p => {
@@ -1112,7 +1129,6 @@ window.exportToExcel = function (dataInput, filename, titleStr = '', periodStr =
             dayjs(p.date).format('DD.MM.YYYY'),
             p.title,
             p.bank,
-            p.category,
             p.amount,
             p.subCategory || 'Diğer',
             p.note || ''
@@ -1120,20 +1136,9 @@ window.exportToExcel = function (dataInput, filename, titleStr = '', periodStr =
     });
 
     const totalAmount = data.reduce((sum, p) => sum + p.amount, 0);
-    aoa.push(['', '', '', 'GENEL TOPLAM:', totalAmount, '', '']);
-
-    // Summary Table Data
-    const categories = ['Kredi', 'Çek', 'Kira', 'Kredi Kartı', 'Fatura', 'Maaş+SGK', 'Diğer'];
-    const summaryAoa = [['Kategori', 'Tutar']];
-    categories.forEach(cat => {
-        const total = data.filter(p => p.category === cat).reduce((sum, p) => sum + p.amount, 0);
-        summaryAoa.push([cat, total]);
-    });
-    summaryAoa.push(['GENEL TOPLAM:', totalAmount]);
+    aoa.push(['', '', 'GENEL TOPLAM:', totalAmount, '', '']);
 
     const ws = XLSX.utils.aoa_to_sheet(aoa);
-    // Add Summary table to Column I (index 8) starting row 4 (index 3)
-    XLSX.utils.sheet_add_aoa(ws, summaryAoa, { origin: { r: 3, c: 8 } });
 
     const b = { top: { style: 'thin', color: { rgb: "000000" } }, bottom: { style: 'thin', color: { rgb: "000000" } }, left: { style: 'thin', color: { rgb: "000000" } }, right: { style: 'thin', color: { rgb: "000000" } } };
 
@@ -1161,51 +1166,30 @@ window.exportToExcel = function (dataInput, filename, titleStr = '', periodStr =
             const addr = XLSX.utils.encode_cell({ r: R, c: C });
             if (!ws[addr]) continue;
 
-            // Main Table Styling (A-G)
-            if (C <= 6) {
+            // Main Table Styling (A-F)
+            if (C <= 5) {
                 const isHeader = (R === tableHeaderRow);
-                const isTotal = (ws[XLSX.utils.encode_cell({ r: R, c: 3 })] && ws[XLSX.utils.encode_cell({ r: R, c: 3 })].v === 'GENEL TOPLAM:');
+                const isTotal = (ws[XLSX.utils.encode_cell({ r: R, c: 2 })] && ws[XLSX.utils.encode_cell({ r: R, c: 2 })].v === 'GENEL TOPLAM:');
                 const dataRowIndex = R - tableHeaderRow;
                 const isEven = !isHeader && !isTotal && (dataRowIndex % 2 === 0);
 
                 if (isHeader) {
                     ws[addr].s = hdrStyle;
                 } else if (isTotal) {
-                    if (C === 4) ws[addr].s = totalCur;
-                    else if (C === 3) ws[addr].s = totalRight;
+                    if (C === 3) ws[addr].s = totalCur;
+                    else if (C === 2) ws[addr].s = totalRight;
                     else ws[addr].s = totalBase;
                 } else if (isEven) {
-                    if (C === 4) ws[addr].s = blueCurStyle;
+                    if (C === 3) ws[addr].s = blueCurStyle;
                     else ws[addr].s = blueStyle;
                 } else {
-                    if (C === 4) ws[addr].s = greenCurStyle;
-                    else ws[addr].s = greenStyle;
-                }
-            }
-
-            // Summary Table Styling (I-J)
-            if (C >= 8 && C <= 9) {
-                const isHeader = (R === tableHeaderRow);
-                const isTotal = (ws[XLSX.utils.encode_cell({ r: R, c: 8 })] && ws[XLSX.utils.encode_cell({ r: R, c: 8 })].v === 'GENEL TOPLAM:');
-                const summaryRowIndex = R - tableHeaderRow;
-                const isEven = !isHeader && !isTotal && (summaryRowIndex % 2 === 0);
-
-                if (isHeader) {
-                    ws[addr].s = hdrStyle;
-                } else if (isTotal) {
-                    if (C === 9) ws[addr].s = totalCur;
-                    else ws[addr].s = totalBase;
-                } else if (isEven) {
-                    if (C === 9) ws[addr].s = blueCurStyle;
-                    else ws[addr].s = blueStyle;
-                } else {
-                    if (C === 9) ws[addr].s = greenCurStyle;
+                    if (C === 3) ws[addr].s = greenCurStyle;
                     else ws[addr].s = greenStyle;
                 }
             }
         }
     }
-    ws['!cols'] = [{ wpx: 80 }, { wpx: 220 }, { wpx: 100 }, { wpx: 120 }, { wpx: 100 }, { wpx: 150 }, { wpx: 250 }, { wpx: 20 }, { wpx: 120 }, { wpx: 100 }];
+    ws['!cols'] = [{ wpx: 80 }, { wpx: 220 }, { wpx: 100 }, { wpx: 100 }, { wpx: 150 }, { wpx: 250 }];
 
     const workbook = XLSX.utils.book_new();
 
@@ -1798,6 +1782,12 @@ document.addEventListener('DOMContentLoaded', () => {
             e.returnValue = msg;
             return msg;
         };
+
+        // Gelir Filtre Dinleyicileri
+        const filterMonth = document.getElementById("incomeFilterMonth");
+        const filterYear = document.getElementById("incomeFilterYear");
+        if (filterMonth) filterMonth.onchange = () => renderIncomes();
+        if (filterYear) filterYear.onchange = () => renderIncomes();
     }
 });
 window.openIncomeModal = function () {
@@ -1811,6 +1801,15 @@ window.openIncomeModal = function () {
     const today = dayjs().format("DD.MM.YYYY");
     document.getElementById("incDate").value = today;
     if (window.incDatePicker) window.incDatePicker.setDate(today);
+    
+    // Set default filter to current month/year
+    const filterMonth = document.getElementById("incomeFilterMonth");
+    const filterYear = document.getElementById("incomeFilterYear");
+    if (filterMonth && filterYear) {
+        filterMonth.value = dayjs().month().toString();
+        filterYear.value = dayjs().year().toString();
+    }
+    
     renderIncomes();
 };
 
@@ -1856,8 +1855,17 @@ function renderIncomes() {
     if (!container) return;
     container.innerHTML = "";
     
-    const currentMonth = dayjs().month();
-    const currentYear = dayjs().year();
+    const filterMonthEl = document.getElementById("incomeFilterMonth");
+    const filterYearEl = document.getElementById("incomeFilterYear");
+    
+    const currentMonth = filterMonthEl ? parseInt(filterMonthEl.value) : dayjs().month();
+    const currentYear = filterYearEl ? parseInt(filterYearEl.value) : dayjs().year();
+
+    const listTitleEl = document.getElementById("incomeListTitle");
+    if (listTitleEl && filterMonthEl) {
+        const selectedMonthText = filterMonthEl.options[filterMonthEl.selectedIndex].text;
+        listTitleEl.innerText = selectedMonthText + " Ayı Gelirleri";
+    }
     
     const filtered = incomes.filter(i => {
         const d = dayjs(i.date);
@@ -1936,27 +1944,69 @@ window.deleteIncome = function (id) {
 };
 
 window.downloadSampleIncomeExcel = function () {
+    const banks = Object.keys(bankColors);
+    const categories = incomeCategories;
+
     const data = [
-        ["BAŞLIK", "TUTAR", "BANKA", "KATEGORİ", "TARİH", "NOT", "", "GEÇERLİ BANKALAR"],
-        ["Örnek Gelir", 5000, "ZİRAAT", "Satış Geliri", dayjs().format("DD.MM.YYYY"), "Örnek Not", "", "AKBANK"],
-        ["", "", "", "", "", "", "", "DENİZBANK"],
-        ["", "", "", "", "", "", "", "GARANTİ"],
-        ["", "", "", "", "", "", "", "HALK BANKASI"],
-        ["", "", "", "", "", "", "", "İNG"],
-        ["", "", "", "", "", "", "", "İŞ BANKASI"],
-        ["", "", "", "", "", "", "", "KUVEYTTÜRK"],
-        ["", "", "", "", "", "", "", "QNB"],
-        ["", "", "", "", "", "", "", "ŞEKERBANK"],
-        ["", "", "", "", "", "", "", "TEB"],
-        ["", "", "", "", "", "", "", "VAKIFBANK"],
-        ["", "", "", "", "", "", "", "VAKIF KATILIM"],
-        ["", "", "", "", "", "", "", "YAPIKREDİ"],
-        ["", "", "", "", "", "", "", "ZİRAAT"],
-        ["", "", "", "", "", "", "", "ZİRAAT KATILIM BANKASI"],
-        ["", "", "", "", "", "", "", "NAKİT KASA"],
-        ["", "", "", "", "", "", "", "DİĞER"]
+        ["BAŞLIK", "TUTAR", "BANKA", "KATEGORİ", "TARİH", "NOT", "", "GEÇERLİ BANKALAR", "KATEGORİLER"],
+        ["Örnek Gelir", 5000, "ZİRAAT", categories[0] || "Satış Geliri", dayjs().format("DD.MM.YYYY"), "Örnek Not", "", banks[0] || "", categories[0] || ""],
     ];
+
+    const maxLen = Math.max(banks.length, categories.length, 20);
+    for (let i = 1; i < maxLen; i++) {
+        data.push(["", "", "", "", "", "", "", banks[i] || "", categories[i] || ""]);
+    }
+
     const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // SÜTUN GENİŞLİKLERİ
+    ws['!cols'] = [
+        { wch: 25 }, { wch: 12 }, { wch: 15 }, { wch: 25 }, { wch: 12 }, { wch: 25 }, // A-F
+        { wch: 5 },                                                    // G
+        { wch: 23 }, { wch: 23 }                                       // H, I
+    ];
+
+    // SATIR YÜKSEKLİKLERİ
+    ws['!rows'] = [{ hpt: 27 }];
+    for (let i = 1; i < maxLen + 1; i++) ws['!rows'].push({ hpt: 20 });
+
+    // Stiller
+    const b = { top: { style: 'thin' }, bottom: { style: 'thin' }, left: { style: 'thin' }, right: { style: 'thin' } };
+    const headerStyle = {
+        font: { bold: true, size: 12 },
+        fill: { fgColor: { rgb: "B2B2B2" } },
+        border: b,
+        alignment: { horizontal: "center", vertical: "center" }
+    };
+    const helperHeaderStyle = {
+        font: { bold: true, size: 12, name: "Calibri" },
+        fill: { fgColor: { rgb: "B2B2B2" } },
+        border: b,
+        alignment: { horizontal: "center", vertical: "center" }
+    };
+
+    const blueZebra = { fill: { fgColor: { rgb: "CFE2F3" } }, border: b, alignment: { vertical: "center" } };
+    const greenZebra = { fill: { fgColor: { rgb: "D9EAD3" } }, border: b, alignment: { vertical: "center" } };
+
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const addr = XLSX.utils.encode_cell({ r: R, c: C });
+            if (!ws[addr]) ws[addr] = { v: "" };
+
+            if (R === 0) {
+                // Header
+                if (C === 7 || C === 8) ws[addr].s = helperHeaderStyle;
+                else if (C < 6) ws[addr].s = headerStyle;
+            } else if (R < data.length) {
+                // Zebra
+                if (C < 6 || C === 7 || C === 8) {
+                    ws[addr].s = (R % 2 === 0) ? blueZebra : greenZebra;
+                }
+            }
+        }
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Gelir Taslak");
     XLSX.writeFile(wb, "gelir_yukleme_taslak.xlsx");
@@ -2009,7 +2059,10 @@ document.getElementById("processIncExcelBtn").onclick = function() {
             const title = row["Aciklama"] || row["Açıklama"] || row["Başlık"] || row["BAŞLIK"];
             const amount = parseFloat(row["Tutar"] || row["Miktar"] || row["TUTAR"]);
             const bank = (row["Banka"] || row["BANKA"] || "DİĞER").toString().toUpperCase();
-            const category = row["Kategori"] || row["KATEGORİ"] || "Diğer Ödemeler";
+            let category = row["Kategori"] || row["KATEGORİ"] || "Diğer Ödemeler";
+            if (category === "Döviz Kuru Değerleme Kazancı" || category === "Döviz Kuru değerleme kazancı") {
+                category = "Döviz Satış Karları";
+            }
             const dateStr = row["Tarih"] || row["TARİH"];
             const note = row["Not"] || row["NOT"] || "";
             
@@ -2033,15 +2086,7 @@ document.getElementById("processIncExcelBtn").onclick = function() {
 // Ödeme Excel Listener (onchange için)
 document.getElementById("incomeExcelInput").onchange = window.handleIncomeExcelSelect;
 document.getElementById("excelImportInput").onchange = function(e) {
-    const file = e.target.files[0];
-    const nameLabel = document.getElementById("excelFileNameDisplay");
-    const uploadBtn = document.getElementById("uploadExcelBtn");
+    window.handleExcelFileSelect(e);
     const removeBtn = document.getElementById("clearPaymentExcelBtn");
-    if(!file) return;
-    if(nameLabel) {
-        nameLabel.innerText = file.name + " SEÇİLDİ";
-        nameLabel.classList.add("border-emerald-400", "bg-emerald-50");
-    }
-    if(uploadBtn) uploadBtn.classList.remove("hidden");
-    if(removeBtn) removeBtn.classList.remove("hidden");
+    if (e.target.files[0] && removeBtn) removeBtn.classList.remove("hidden");
 };
