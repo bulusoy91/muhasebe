@@ -1273,6 +1273,11 @@ window.exportToExcel = function (dataInput, filename, titleStr = '', periodStr =
     flowAoa.push(["", "", "", "", ""]);
     flowAoa.push(["", "", "", "NET DURUM:", totalInc - totalAmount]);
 
+    // Alınan Krediler değerini topla
+    const creditInc = periodIncomes.filter(inc => inc.category === "Alınan Krediler").reduce((s, inc) => s + inc.amount, 0);
+    const netWithoutCredit = (totalInc - totalAmount) - creditInc;
+    flowAoa.push(["", "", "", "KREDİ HARİÇ :", netWithoutCredit]);
+
     const wsFlow = XLSX.utils.aoa_to_sheet(flowAoa);
     // Nakit Akış Stil
     const rangeFlow = XLSX.utils.decode_range(wsFlow['!ref']);
@@ -1283,18 +1288,88 @@ window.exportToExcel = function (dataInput, filename, titleStr = '', periodStr =
             if(R === 0) wsFlow[addr].s = titleStyle;
             else if(R === 2) wsFlow[addr].s = hdrStyle;
             else if(C === 1 || C === 4) {
-                wsFlow[addr].s = (R >= rangeFlow.e.r - 2) ? totalCur : blueCurStyle;
+                wsFlow[addr].s = (R >= rangeFlow.e.r - 3) ? totalCur : blueCurStyle;
                 // Net durum özel renk
-                if (R === rangeFlow.e.r && C === 4) {
+                if (R === rangeFlow.e.r - 1 && C === 4) {
                     const diff = totalInc - totalAmount;
                     wsFlow[addr].s = { ...totalCur, fill: { fgColor: { rgb: diff >= 0 ? "D9EAD3" : "F4CCCC" } }, font: { bold: true, color: { rgb: diff >= 0 ? "38761D" : "990000" } } };
                 }
+                // Kredi hariç özel renk
+                if (R === rangeFlow.e.r && C === 4) {
+                    const diff = netWithoutCredit;
+                    wsFlow[addr].s = { ...totalCur, fill: { fgColor: { rgb: diff >= 0 ? "D9EAD3" : "F4CCCC" } }, font: { bold: true, color: { rgb: diff >= 0 ? "38761D" : "990000" } } };
+                }
             }
-            else if(C === 0 || C === 3) wsFlow[addr].s = (R >= rangeFlow.e.r - 2) ? totalBase : blueStyle;
+            else if(C === 0 || C === 3) wsFlow[addr].s = (R >= rangeFlow.e.r - 3) ? totalBase : blueStyle;
         }
     }
     wsFlow['!cols'] = [{wpx:150}, {wpx:100}, {wpx:30}, {wpx:150}, {wpx:100}];
     XLSX.utils.book_append_sheet(workbook, wsFlow, "Nakit Akış");
+
+    // --- SHEET 4: MASRAF MERKEZİ ---
+    const monthNames = ['OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN', 'TEMMUZ', 'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'];
+    const mmTitle = "AKSARAY GELİR GİDER TABLOSU - " + monthNames[month] + " " + year;
+    const mmAoa = [
+        [mmTitle, ""],
+        ["Giderler", ""],
+        ["Maaşlar", ""],
+        ["GİDERLER", ""],
+        ["", ""],
+        ["Kesilen Hakediş Faturası", ""],
+        ["GELİRLER", ""],
+        ["", ""],
+        ["KAR/ZARAR", 0],
+        ["", ""],
+        ["ÖNCEKİ AYLAR KAR/ZARAR", ""],
+        ["KÜMÜLE KAR/ZARAR", 0]
+    ];
+
+    const wsMM = XLSX.utils.aoa_to_sheet(mmAoa);
+    
+    // A1:B1 birleştir
+    wsMM['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }
+    ];
+    
+    const mmB = { top: { style: 'thin', color: { rgb: "000000" } }, bottom: { style: 'thin', color: { rgb: "000000" } }, left: { style: 'thin', color: { rgb: "000000" } }, right: { style: 'thin', color: { rgb: "000000" } } };
+    const mmTitleStyle = { font: { bold: true, size: 12 }, alignment: { horizontal: "center", vertical: "center" }, border: mmB };
+    const mmLabelStyle = { font: { name: "Calibri" }, border: mmB, alignment: { vertical: "center" } };
+    const mmHdrStyle = { font: { bold: true, name: "Calibri" }, border: mmB, alignment: { horizontal: "center", vertical: "center" } };
+    const mmTotalStyle = { font: { bold: true, name: "Calibri" }, border: mmB, alignment: { horizontal: "center", vertical: "center" } };
+    const mmValStyle = { font: { bold: true, color: { rgb: "38761D" } }, border: mmB, alignment: { horizontal: "right" }, numFmt: "#,##0.00\ \"\u20BA\"" };
+    
+    const rangeMM = XLSX.utils.decode_range(wsMM['!ref']);
+    for(let R=0; R <= rangeMM.e.r; R++) {
+        for(let C=0; C <= rangeMM.e.c; C++) {
+            const addr = XLSX.utils.encode_cell({r:R, c:C});
+            if(!wsMM[addr]) wsMM[addr] = { v: "" };
+            
+            if (R === 0) {
+                wsMM[addr].s = mmTitleStyle;
+            } else if (R === 1 || R === 2) {
+                wsMM[addr].s = mmLabelStyle;
+            } else if (R === 3) {
+                wsMM[addr].s = mmHdrStyle;
+            } else if (R === 5) {
+                wsMM[addr].s = mmLabelStyle;
+            } else if (R === 6) {
+                wsMM[addr].s = mmHdrStyle;
+            } else if (R === 8) {
+                if (C === 0) wsMM[addr].s = mmTotalStyle;
+                else wsMM[addr].s = mmValStyle;
+            } else if (R === 10 || R === 11) {
+                const plainStyle = { font: { bold: R === 11, name: "Calibri" }, alignment: { horizontal: C === 1 ? "right" : "left" } };
+                if (R === 11 && C === 1) {
+                    plainStyle.numFmt = "#,##0.00\ \"\u20BA\"";
+                }
+                wsMM[addr].s = plainStyle;
+            }
+        }
+    }
+    
+    wsMM['!cols'] = [{ wpx: 250 }, { wpx: 150 }];
+    wsMM['!rows'] = [{ hpt: 25 }, { hpt: 20 }, { hpt: 20 }, { hpt: 22 }, { hpt: 15 }, { hpt: 20 }, { hpt: 22 }, { hpt: 15 }, { hpt: 25 }, { hpt: 15 }, { hpt: 20 }, { hpt: 20 }];
+    XLSX.utils.book_append_sheet(workbook, wsMM, "Masraf Merkezi");
 
     if (showBankDetails) {
         // Banka detayları kaldırıldı.
